@@ -294,6 +294,7 @@ public class LinkedHashMap<K,V>
             a.before = b;
     }
 
+    //用来实现LRU 将最老的移除掉
     void afterNodeInsertion(boolean evict) { // possibly remove eldest
         LinkedHashMap.Entry<K,V> first;
         if (evict && (first = head) != null && removeEldestEntry(first)) {
@@ -302,6 +303,8 @@ public class LinkedHashMap<K,V>
         }
     }
 
+
+    //用来实现LRUCache 将访问节点移到链表最后
     void afterNodeAccess(Node<K,V> e) { // move node to last
         LinkedHashMap.Entry<K,V> last;
         if (accessOrder && (last = tail) != e) {

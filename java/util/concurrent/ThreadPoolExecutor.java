@@ -345,9 +345,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * The runState provides the main lifecycle control, taking on values:
      *
      *   RUNNING:  Accept new tasks and process queued tasks
-     *   SHUTDOWN: Don't accept new tasks, but process queued tasks
-     *   STOP:     Don't accept new tasks, don't process queued tasks,
-     *             and interrupt in-progress tasks
+     *   SHUTDOWN: Don't accept new tasks, but process queued tasks 不会接收新的任务，但是会继续执行阻塞队列中的任务
+     *   STOP:     Don't accept new tasks, don't process queued tasks, 不会接收新的任务，也不会将任务添加到阻塞队列
+     *             and interrupt in-progress tasks 会中断正在处理中的任务
      *   TIDYING:  All tasks have terminated, workerCount is zero,
      *             the thread transitioning to state TIDYING
      *             will run the terminated() hook method
@@ -913,6 +913,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
             for (;;) {
                 int wc = workerCountOf(c);
+                //如果大于maximumPoolSize则会失败，后续会通过拒绝策略来处理任务
                 if (wc >= CAPACITY ||
                     wc >= (core ? corePoolSize : maximumPoolSize))
                     return false;
@@ -938,6 +939,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     // Recheck while holding lock.
                     // Back out on ThreadFactory failure or if
                     // shut down before lock acquired.
+                    //double check 线程池的状态，防止获取锁后线程池关闭
                     int rs = runStateOf(ctl.get());
 
                     if (rs < SHUTDOWN ||
@@ -954,6 +956,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     mainLock.unlock();
                 }
                 if (workerAdded) {
+                    //执行业务逻辑
                     t.start();
                     workerStarted = true;
                 }
@@ -1338,6 +1341,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *         {@code RejectedExecutionHandler}, if the task
      *         cannot be accepted for execution
      * @throws NullPointerException if {@code command} is null
+     *
+     * 首先会使用核心线程数来执行任务，如果工作线程数大于核心线程数，则会尝试任务添加到阻塞队列中，
+     * 如果添加失败，则会尝试使用非核心线程来执行任务
+     * 如果失败，则会根据对应的拒绝策略来处理任务
+     *
+     *
      */
     public void execute(Runnable command) {
         if (command == null)
@@ -1363,19 +1372,25 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * and so reject the task.
          */
         int c = ctl.get();
+        //如果线程数小于核心线程数，启动核心线程来执行任务
         if (workerCountOf(c) < corePoolSize) {
             if (addWorker(command, true))
                 return;
             c = ctl.get();
         }
+        //大于核心线程数，将任务添加到阻塞队列中
         if (isRunning(c) && workQueue.offer(command)) {
             int recheck = ctl.get();
+            //再次检查线程池状态
             if (! isRunning(recheck) && remove(command))
                 reject(command);
+            //如果工作线程数等于0，则会创建一个空线程
             else if (workerCountOf(recheck) == 0)
                 addWorker(null, false);
         }
+        //如果没将任务添加到队列中 尝试启动非核心线程来执行任务
         else if (!addWorker(command, false))
+            //如果没添加成功，则会使用拒绝策略来处理任务
             reject(command);
     }
 
@@ -2019,6 +2034,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * directly in the calling thread of the {@code execute} method,
      * unless the executor has been shut down, in which case the task
      * is discarded.
+     * 使用父线程来执行任务
      */
     public static class CallerRunsPolicy implements RejectedExecutionHandler {
         /**
@@ -2043,6 +2059,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     /**
      * A handler for rejected tasks that throws a
      * {@code RejectedExecutionException}.
+     * 抛出RejectedExecutionException，丢弃任务
      */
     public static class AbortPolicy implements RejectedExecutionHandler {
         /**
@@ -2067,6 +2084,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     /**
      * A handler for rejected tasks that silently discards the
      * rejected task.
+     * 拒绝处理任务，不会抛出异常
      */
     public static class DiscardPolicy implements RejectedExecutionHandler {
         /**
@@ -2088,6 +2106,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * A handler for rejected tasks that discards the oldest unhandled
      * request and then retries {@code execute}, unless the executor
      * is shut down, in which case the task is discarded.
+     * 弹出队列中最老的任务，将当前任务添加到队列中
      */
     public static class DiscardOldestPolicy implements RejectedExecutionHandler {
         /**
