@@ -1015,11 +1015,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             Node<K,V> f; int n, i, fh;
             if (tab == null || (n = tab.length) == 0)
                 tab = initTable();
+            //如果hash table中没有匹配的，这直接将Node放到Hash table
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
                 if (casTabAt(tab, i, null,
                              new Node<K,V>(hash, key, value, null)))
                     break;                   // no lock when adding to empty bin
             }
+            //resize
             else if ((fh = f.hash) == MOVED)
                 tab = helpTransfer(tab, f);
             else {
