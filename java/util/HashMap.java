@@ -379,6 +379,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Returns a power of two size for the given target capacity.
+     * 初始化容量，大小是2的倍数
      */
     static final int tableSizeFor(int cap) {
         int n = cap - 1;
@@ -435,6 +436,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * The load factor for the hash table.
+     * 负载因子，默认为0.75，这是时间和空间上的一种折衷，增大负载因子可以减少Hash表所占用的空间，
+     * 但会增加查询的时间开销，减小负载因子可以提高数据查询的性能，但会增加Hash表占用的内存空间
      *
      * @serial
      */
@@ -764,9 +767,11 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Replaces all linked nodes in bin at index for given hash unless
      * table is too small, in which case resizes instead.
+     * 链表转红黑数
      */
     final void treeifyBin(Node<K,V>[] tab, int hash) {
         int n, index; Node<K,V> e;
+        //如果链表的长度大于等于8，并且哈希表长度小于64时，会进行扩容
         if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
             resize();
         else if ((e = tab[index = (n - 1) & hash]) != null) {
@@ -2407,5 +2412,4 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return true;
         }
     }
-
 }
