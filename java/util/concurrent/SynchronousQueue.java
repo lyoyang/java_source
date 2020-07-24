@@ -191,6 +191,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
      * variety of processors and OSes. Empirically, the best value
      * seems not to vary with number of CPUs (beyond 2) so is just
      * a constant.
+     * 阻塞等待之前 用来计算自旋次数
      */
     static final int maxTimedSpins = (NCPUS < 2) ? 0 : 32;
 
@@ -198,6 +199,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
      * The number of times to spin before blocking in untimed waits.
      * This is greater than timed value because untimed waits spin
      * faster since they don't need to check times on each spin.
+     * 阻塞等待之前 自旋次数
      */
     static final int maxUntimedSpins = maxTimedSpins * 16;
 
@@ -254,7 +256,8 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
              * Waiters block until they have been matched.
              *
              * @param s the node to match
-             * @return true if successfully matched to s
+             * @return true if successfully matched to
+             * 消费成功了会调用该方法来唤醒生产者
              */
             boolean tryMatch(SNode s) {
                 if (match == null &&
@@ -353,17 +356,21 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             for (;;) {
                 SNode h = head;
                 if (h == null || h.mode == mode) {  // empty or same-mode
+                    //如果设置了超时时间，并且e进栈或者出栈要超时了
                     if (timed && nanos <= 0) {      // can't wait
+                        //如果栈头取消了，丢弃栈头直接取下一条
                         if (h != null && h.isCancelled())
                             casHead(h, h.next);     // pop cancelled node
                         else
                             return null;
                     } else if (casHead(h, s = snode(s, e, h, mode))) {
+                        //等待执行
                         SNode m = awaitFulfill(s, timed, nanos);
                         if (m == s) {               // wait was cancelled
                             clean(s);
                             return null;
                         }
+                        //本来 s 是栈头的，现在 s 不是栈头了，s 后面又来了一个数，把新的数据作为栈头
                         if ((h = head) != null && h.next == s)
                             casHead(h, s.next);     // help s's fulfiller
                         return (E) ((mode == REQUEST) ? m.item : s.item);
